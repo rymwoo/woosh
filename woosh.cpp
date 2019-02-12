@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <string>
 #include <utility>
+#include <fstream>
 #include "parse.h"
 #include "history.h"
 
@@ -99,6 +100,30 @@ void builtInAlias(string key, unordered_map<string,string> &aliases) {
   }
 }
 
+void builtInSource(unordered_map<string,string> &aliases) {
+  const char rcFile[50]=".woosh/woosh.rc";
+  
+  std::ifstream rc;
+  rc.open(rcFile);
+  if (!rc.is_open()) {
+    cout<<"Unable to load resource file. Using defaults instead.\n";
+    return;
+  }
+  string input;
+  while (!rc.eof()) {
+    getline(rc,input);
+    if (input.find("alias")==0) {
+      input = input.substr(input.find(" ")+1,input.length()-input.find(" ")-1);
+      size_t splitIdx = input.find("=");
+      if (splitIdx == string::npos) {
+        cout<<"Malformed resource file. "<<input<<" does not appear to be a valid alias.\n";
+        return;
+      }
+      builtInAlias(input, aliases);
+    }
+  }
+  rc.close();
+}
 /////////////////////////////
 /*
   Built-in functions end
@@ -130,13 +155,13 @@ void redirectOutputFile(char origin, string file) {
 void redirectOutputDescriptor(char origin, char descriptor) {
   const int CHAR_OFFSET = 48;
   //destinations for redirect already validated in lexer, must be [12]
-  int token = (int)descriptor-CHAR_OFFSET;
+  int descrNumber = (int)descriptor-CHAR_OFFSET;
   if (origin!='&') {
     close(((int)origin)-CHAR_OFFSET);
-    dup(token);
+    dup(descrNumber);
   } else { //redirecting both STDOUT and STDERR
-    dup2(token,STDOUT_FILENO);
-    dup2(token,STDERR_FILENO);
+    dup2(descrNumber,STDOUT_FILENO);
+    dup2(descrNumber,STDERR_FILENO);
   }
 }
 
@@ -229,7 +254,8 @@ void debugPrintList(llist<std::pair<string,int>> list) {
 int main(){
   unordered_map<string,string> aliases;
   History *history = history->getInstance();
-
+  builtInSource(aliases);
+  
   while (true) {
 
     string input;
