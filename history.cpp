@@ -2,16 +2,27 @@
 #include <iostream>
 #include <string.h>
 
-namespace history{
-  namespace {
-    vector<std::pair<int,string>> history; // <index,input>
-    static int HIST_INDEX=1;
-    int MAX_HIST_SZ = 5;
-    char previousDir[200];
-  }
+
+History* History::instance = NULL;
+int History::HIST_INDEX = 1;
+
+History::History() {}
+
+History* History::getInstance() {
+  if (instance==NULL)
+    return new History();
+  else
+    return instance;
 }
 
-void history::push_back(string str) {
+void History::setPreviousDir(char* src) {
+  strcpy(previousDir,src);
+}
+char* History::getPreviousDir() {
+  return previousDir;
+}
+
+void History::push_back(string str) {
   if (HIST_INDEX>MAX_HIST_SZ) {
     history[(HIST_INDEX-1)%MAX_HIST_SZ].first=HIST_INDEX;
     history[(HIST_INDEX-1)%MAX_HIST_SZ].second=str;
@@ -21,13 +32,13 @@ void history::push_back(string str) {
   }
   HIST_INDEX++;
 }
-bool history::empty() {
+bool History::empty() {
   return history.empty();
 }
-int history::size() {
+int History::size() {
   return history.size();
 }
-string history::get(int idx) {
+string History::get(int idx) {
   if (idx<0)
     idx = HIST_INDEX+idx;
   int mod = (idx-1)%MAX_HIST_SZ;
@@ -43,16 +54,9 @@ string history::get(int idx) {
     return "";
   }
 }
-int history::max_size() {
+int History::max_size() {
   return MAX_HIST_SZ;
 }
-int history::next_index(){
+int History::next_index(){
   return HIST_INDEX;
-}
-
-void history::setPreviousDir(char* src) {
-  strcpy(previousDir,src);
-}
-char* history::getPreviousDir() {
-  return previousDir;
 }

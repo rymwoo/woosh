@@ -18,23 +18,23 @@
 */
 /////////////////////////////
 
-void builtInHistory() {
-  if (history::empty()) {
+void builtInHistory(History *history) {
+  if (history->empty()) {
     cout<<"No history to show\n";
   } else {
     int i;
-    for(i=0;i<history::size();i++) {
-      if (history::next_index()>history::size()) {
-        int idx = history::next_index()-history::size()+i;
-        cout<<idx<<" "<<history::get(idx)<<std::endl;
+    for(i=0;i<history->size();i++) {
+      if (history->next_index()>history->size()) {
+        int idx = history->next_index()-history->size()+i;
+        cout<<idx<<" "<<history->get(idx)<<std::endl;
       } else {
-        cout<<i+1<<" "<<history::get(i+1)<<std::endl;
+        cout<<i+1<<" "<<history->get(i+1)<<std::endl;
       }
     }
   }
 }
 
-void builtInCd(string token) {
+void builtInCd(string token, History* history) {
   char *cwd = getcwd(0,0);
   int dirStatus;
   if (token.find("..")==0) { //up one level
@@ -70,7 +70,7 @@ void builtInCd(string token) {
     }
     dirStatus = chdir(home);
   } else if (token.compare("-")==0) { //toggle previous
-    dirStatus = chdir(history::getPreviousDir());
+    dirStatus = chdir(history->getPreviousDir());
   } else if (token[0]=='/') { //go to specific dir
     dirStatus = chdir(token.c_str());
   } else { //go to sub dir
@@ -79,7 +79,7 @@ void builtInCd(string token) {
     dirStatus = chdir(dest.c_str());
   }
   if (dirStatus==0) {
-    history::setPreviousDir(cwd);
+    history->setPreviousDir(cwd);
   } else {
     perror("cd");
   }
@@ -180,7 +180,7 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
   }
 }
 
-void historyExpansion(string &input) {
+void historyExpansion(string &input, History* history) {
   int i=0;
   bool neg=false;
   while (i<input.length()) {
@@ -206,7 +206,7 @@ void historyExpansion(string &input) {
           histNum = -histNum;
           i--;
         }
-        input.replace(i,numEnd-i+1,history::get(histNum));
+        input.replace(i,numEnd-i+1,history->get(histNum));
         i=numEnd;
       } else {
         cout<<"valid history not found\n";
@@ -228,6 +228,7 @@ void debugPrintList(llist<std::pair<string,int>> list) {
 
 int main(){
   unordered_map<string,string> aliases;
+  History *history = history->getInstance();
 
   while (true) {
 
@@ -236,8 +237,8 @@ int main(){
       showPrompt();
       std::getline(std::cin,input);
     } while (input.empty());
-    historyExpansion(input);
-    history::push_back(input);
+    historyExpansion(input, history);
+    history->push_back(input);
     replaceAliases(input, aliases);
 
     llist<std::pair<string,int>> inp = tokenizeInput(input);
@@ -250,7 +251,7 @@ int main(){
       case EXIT:
           exit(0);
       case HISTORY: {
-          builtInHistory();
+          builtInHistory(history);
           break;
         } //case HISTORY
       case ALIAS: {
@@ -266,11 +267,11 @@ int main(){
         } //case ALIAS
       case CD: {
           if (inp.size()<2) {
-            builtInCd("~");
+            builtInCd("~",history);
           } else { //cd using next arg
             llist<std::pair<string,int>>::iterator it = inp.begin();
             it++;
-            builtInCd((*it).first);
+            builtInCd((*it).first,history);
           }
           break;
         } //case CD

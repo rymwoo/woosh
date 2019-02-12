@@ -8,20 +8,28 @@
 using std::vector;
 using std::string;
 
-namespace history{
-  namespace {
-    extern vector<std::pair<int,string>> history; // <index,input>
-    extern int MAX_HIST_SZ;
-    extern char previousDir[200];
-  }
-  void push_back(string str);
-  bool empty();
-  int size();
-  string get(int idx);
-  int max_size();
-  int next_index();
-  void setPreviousDir(char* src);
-  char* getPreviousDir();
-}
+class History {
+  public:
+    static History* getInstance();
+    ~History();
+    
+    void setPreviousDir(char* src);
+    char* getPreviousDir();
+    
+    void push_back(string str);
+    bool empty();
+    int size();
+    string get(int idx);
+    int max_size();
+    int next_index();
+
+  private:
+    History();
+    vector<std::pair<int,string>> history; // <index,input>
+    static History* instance;
+    static int HIST_INDEX;
+    int MAX_HIST_SZ = 5;
+    char previousDir[200];
+};
 
 #endif
