@@ -196,12 +196,24 @@ llist<std::pair<string,int>> tokenizeInput(string str) {
 
 void replaceAliases(string &input, unordered_map<string,string> &aliases) {
   for(auto x:aliases) {
-    size_t idx = input.find(x.first);
-    if (idx!=string::npos) {
-      int aliasLen=x.first.length();
-      input.replace(idx,aliasLen,x.second);
-      std::clog<<"replaced ["<<x.first<<"] alias in input\n";
-    }
+    string alKey = x.first;
+    int alLength = alKey.length();
+    int idx=0;
+    do {
+      // if alias found at idx; check if it it a standalone token vs prefix and in-bounds || end of string
+      if (alKey.compare(input.substr(idx,alLength))==0) {
+        if ((idx==0 || input[idx-1]==' ') && //beginning is separated
+        (idx+alLength<input.length() && input[idx+alLength]==' ' || idx+alLength==input.length())) {//end is separated
+          if (x.second[0]=='"' && x.second[x.second.length()-1]=='"')
+            input.replace(idx,alLength,x.second.substr(1,x.second.length()-2));
+          else
+            input.replace(idx,alLength,x.second);
+          std::clog<<"replaced ["<<x.first<<"] alias in input\n";
+          idx+=x.second.length();
+        }
+      }
+      idx++;
+    } while (idx < input.length());
   }
 }
 
