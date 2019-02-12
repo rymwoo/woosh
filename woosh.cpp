@@ -285,41 +285,57 @@ int main(){
               } //REDIRECT_IN
               else if ((*redirectIter).second == REDIRECT_OUT) {
                 //three parts to REDIRECT_OUT
-                // [descriptorSource]? > [descriptorDestAddress]?
-                // [12]? > (&[12])? 
-                string redirectStr=(*redirectIter).first;
-                string firstPart = redirectStr.substr(0,redirectStr.find(">"));
-                
+                // [firstPart]? > [destStr]?
+                // [12&]? > (&[12])? 
+                string destStr=(*redirectIter).first;
+                string firstPart = destStr.substr(0,destStr.find(">"));
+                destStr = destStr.substr(destStr.find(">")+1,destStr.length()-destStr.find(">")-1);
                 //default redirects STDOUT
-                int descriptorSource;
+                const int CHAR_OFFSET = 48;
+                char descriptorSource;
                 if (firstPart.empty()) {
-                  descriptorSource=1;
+                  descriptorSource='1';
                 } else {
-                  descriptorSource=atoi(firstPart.c_str());
+                  descriptorSource=firstPart[0];
                 }
-                
-                if (redirectStr.find("&")!=string::npos) {
+
+                if (destStr.find("&")!=string::npos) {
                     //destinations for redirect already validated in lexer, must be [12]
-                    int token = (int)redirectStr[redirectStr.length()-1]-48;
-                    close(descriptorSource);
-                    dup(token);
-                } // '&' exists - redirect to address
-                else { // '&' does not exist - redirect to file
+                    int token = (int)destStr[destStr.length()-1]-CHAR_OFFSET;
+                    if (descriptorSource!='&') {
+                      close(((int)descriptorSource)-CHAR_OFFSET);
+                      dup(token);
+                    } else { //redirecting both STDOUT and STDERR
+                      dup2(token,STDOUT_FILENO);
+                      dup2(token,STDERR_FILENO);
+                    }
+                } // '&' exists in destStr - redirect to address
+                else { // '&' does not exist in destStr - redirect to file
                   redirectIter++;
                   if (redirectIter == inp.end()) {
                     cout<<"Redirect error: '>' must be followed by a valid file descriptor\n";
                     _exit(EXIT_FAILURE);
                   }
-                  close(descriptorSource);
-                  int fd = open((*redirectIter).first.c_str(), O_WRONLY|O_TRUNC|O_CREAT);
-                  if (fd==-1) {
-                    perror("redirect to file failed");
+                  int fd;
+                  fd = open((*redirectIter).first.c_str(), O_WRONLY|O_TRUNC|O_CREAT);
+                  if (fd<0) {
+                    perror("failed to open file");
                     _exit(EXIT_FAILURE);
                   } else {
                     //successfully created; make accessible
                     fchmod(fd,S_IROTH|S_IRGRP|S_IRUSR|S_IWUSR);
                   }
-                } // '&' does not exist - redirect to file
+                  if (descriptorSource!='&') {
+                    int descrNumber = ((int)descriptorSource)-CHAR_OFFSET;
+                    dup2(fd,descrNumber);
+                    close(fd);
+                  } //descriptorSource!='&'
+                  else { //redirecting both STDOUT and STDERR
+                    dup2(fd,STDOUT_FILENO);
+                    dup2(fd,STDERR_FILENO);
+                    close(fd);
+                  } //redirecting both STDOUT and STDERR
+                } // '&' does not exist in destStr - redirect to file
               } //REDIRECT_OUT
               redirectIter++;
             } while (redirectIter != inp.end());

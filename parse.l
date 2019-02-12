@@ -12,7 +12,7 @@
 "alias"             return ALIAS;
 "cd"                return CD;
 "<"                 return REDIRECT_IN;
-[12]?>(&[12])?      return REDIRECT_OUT;
+[12&]?>(&[12])?      return REDIRECT_OUT;
 [^ \t\r|&;)(><]+    return TOKEN;
  /*.                   ;*/
 
