@@ -17,6 +17,10 @@ extern int yy_scan_string ( const char *str );
 void builtInHistory();
 void builtInCd(string token);
 void builtInAlias(string key, unordered_map<string,string> &aliases);
+
+void redirectOutputFile(char origin, string file);
+void redirectOutputDescriptor(char origin, char descriptor);
+
 void showPrompt();
 llist<std::pair<string,int>> tokenizeInput(string str);
 void replaceAliases(string &input, unordered_map<string,string> &aliases);
