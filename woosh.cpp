@@ -100,8 +100,7 @@ void builtInAlias(string key, unordered_map<string,string> &aliases) {
   }
 }
 
-void builtInSource(unordered_map<string,string> &aliases) {
-  const char rcFile[50]=".woosh/woosh.rc";
+void builtInSource(unordered_map<string,string> &aliases, string rcFile=".woosh/woosh.rc") {
   
   std::ifstream rc;
   rc.open(rcFile);
@@ -179,7 +178,7 @@ void showPrompt() {
 }
 
 llist<std::pair<string,int>> tokenizeInput(string str) {
-  const string tokenNames[] = {"", "HISTORY","EXIT","ALIAS", "CD", "REDIRECT_IN", "REDIRECT_OUT", "TOKEN"};
+  const string tokenNames[] = {"", "HISTORY","EXIT","ALIAS", "SOURCE", "CD", "REDIRECT_IN", "REDIRECT_OUT", "TOKEN"};
   llist<std::pair<string,int>> input;
   int token;
   yy_scan_string(str.c_str());
@@ -303,6 +302,15 @@ int main(){
           }
           break;
         } //case ALIAS
+      case SOURCE: {
+          if (inp.size()>1) {
+            llist<std::pair<string,int>>::iterator it = inp.begin();
+            it++;
+            builtInSource(aliases,(*it).first);
+          } else
+            builtInSource(aliases);
+          break;
+        } //case SOURCE
       case CD: {
           if (inp.size()<2) {
             builtInCd("~",history);

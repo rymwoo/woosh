@@ -18,7 +18,7 @@ extern int yy_scan_string ( const char *str );
 void builtInHistory(History *history);
 void builtInCd(string token, History* history);
 void builtInAlias(string key, unordered_map<string,string> &aliases);
-void builtInSource(unordered_map<string,string> &aliases);
+void builtInSource(unordered_map<string,string> &aliases, string rcFile);
 
 void redirectOutputFile(char origin, string file);
 void redirectOutputDescriptor(char origin, char descriptor);
