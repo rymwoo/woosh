@@ -1,4 +1,4 @@
-#include "woosh.h"
+#include "../include/woosh.h"
 #include <list>
 #include <unordered_map>
 #include <iostream>
@@ -10,8 +10,8 @@
 #include <string>
 #include <utility>
 #include <fstream>
-#include "parse.h"
-#include "history.h"
+#include "../include/parse.h"
+#include "../include/history.h"
 
 /////////////////////////////
 /*
@@ -35,9 +35,9 @@ void builtInHistory(History *history) {
   }
 }
 
-void builtInCd(string token, History* history) {
+string builtInCd(string token, History* history) {
   char *cwd = getcwd(0,0);
-  int dirStatus;
+  string targetDir;
   if (token.find("..")==0) { //up one level
     //how many levels up are we going
     int levels=0, count=0;
@@ -62,29 +62,31 @@ void builtInCd(string token, History* history) {
     dest[idx+1]='\0';
     token.assign(dest);
     free(dest);
-    dirStatus = chdir((token+endPath).c_str());
+    targetDir = token+endPath;
   } else if (token.compare("~")==0) { //go home
     char* home = getenv("HOME");
     if (home==NULL) {
       std::cerr<<"HOME variable not set";
-      return;
+      return NULL;
     }
-    dirStatus = chdir(home);
+    targetDir=home;
   } else if (token.compare("-")==0) { //toggle previous
-    dirStatus = chdir(history->getPreviousDir());
+    targetDir = history->getPreviousDir();
   } else if (token[0]=='/') { //go to specific dir
-    dirStatus = chdir(token.c_str());
+    targetDir = token;
   } else { //go to sub dir
     string dest(cwd);
     dest = dest+"/"+token;
-    dirStatus = chdir(dest.c_str());
+    targetDir = dest;
   }
+  int dirStatus = chdir(targetDir.c_str());
   if (dirStatus==0) {
     history->setPreviousDir(cwd);
   } else {
     perror("cd");
   }
   free(cwd);
+  return targetDir;
 }
 
 void builtInAlias(string key, unordered_map<string,string> &aliases) {
@@ -131,8 +133,6 @@ void builtInSource(unordered_map<string,string> &aliases, string rcFile=".woosh/
 
 void redirectOutputFile(char origin, string file) {
   const int CHAR_OFFSET = 48;
-  if (file[0]=='"' && file[file.length()-1]=='"')
-    file = file.substr(1,file.length()-2);
   int fd = open(file.c_str(), O_WRONLY|O_TRUNC|O_CREAT);
   if (fd<0) {
     perror("failed to open file");
@@ -187,7 +187,12 @@ llist<std::pair<string,int>> tokenizeInput(string str) {
   token = yylex();
   while(token){
     std::clog<<"["<<yytext<<":"<<tokenNames[token]<<"]";
-    std::pair<string,int> pr(yytext,token);
+    string text = yytext;
+    if (token==TOKEN) {
+      if (text[0]=='"' && text[text.length()-1]=='"')
+        text = text.substr(1,text.length()-2);
+    }
+    std::pair<string,int> pr(text,token);
     input.push_back(pr);
     token = yylex();
   }

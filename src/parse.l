@@ -1,5 +1,5 @@
 %{
-#include "parse.h"
+#include "../include/parse.h"
 /*
 */
 %}

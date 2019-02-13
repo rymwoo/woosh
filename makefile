@@ -1,20 +1,26 @@
-woosh: history.o lex.yy.o woosh.o
-	g++ -o woosh history.o lex.yy.o woosh.o
+EXE = woosh
 
-history.o: history.cpp history.h
-	g++ -c history.cpp
+SRC_DIR = src
+OBJ_DIR = obj
 
-lex.yy.o: lex.yy.c
-	g++ -c lex.yy.c
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o) $(OBJ_DIR)/parse.o
 
-woosh.o: woosh.cpp woosh.h
-	g++ -c woosh.cpp
+all: $(EXE)
 
-lex.yy.c: parse.l parse.h
-	lex parse.l
+$(EXE): $(OBJ)
+	$(CXX) $^ -o $@
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) -c $< -o $@
+
+$(OBJ_DIR)/parse.o: $(SRC_DIR)/parse.c
+	$(CXX) -c $< -o $@
+
+$(SRC_DIR)/parse.c: $(SRC_DIR)/parse.l
+	flex -o $(SRC_DIR)/parse.c $<
 
 clean:
-	rm woosh history.o lex.yy.o woosh.o
+	rm -rf $(OBJ_DIR)/*.o
 
-debug: history.o lex.yy.o woosh.o
-	g++ -o woosh history.o lex.yy.o woosh.o -g
+.PHONY: all
