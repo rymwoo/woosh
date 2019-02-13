@@ -13,8 +13,8 @@
 "cd"                return CD;
 "<"                 return REDIRECT_IN;
 [12&]?>(&[12])?     return REDIRECT_OUT;
-[^ ]*[^\\]?\"([^"\\]|\\.)*\"[^ ]*|[^ ]+  return TOKEN;
- /*.                   ;*/
+[^ <>]*\"([^"\\]|\\.)*\"[^ ]*|[^ <>]+  return TOKEN;
+.                   ;
 
 %%
 

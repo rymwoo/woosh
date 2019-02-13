@@ -131,6 +131,8 @@ void builtInSource(unordered_map<string,string> &aliases, string rcFile=".woosh/
 
 void redirectOutputFile(char origin, string file) {
   const int CHAR_OFFSET = 48;
+  if (file[0]=='"' && file[file.length()-1]=='"')
+    file = file.substr(1,file.length()-2);
   int fd = open(file.c_str(), O_WRONLY|O_TRUNC|O_CREAT);
   if (fd<0) {
     perror("failed to open file");
@@ -365,7 +367,7 @@ int main(){
                 }
               } //REDIRECT_IN
               else if ((*redirectIter).second == REDIRECT_OUT) {
-                // [12&]? > (&[12])? 
+                // [12&]?>(&[12])? 
                 // parse into [origin] > [destination]
                 string destination=(*redirectIter).first;
                 char origin = destination[0];
@@ -393,6 +395,7 @@ int main(){
 
             std::clog<<"Child Process; executing command ["<<argv[0]<<"]...\n";
             execvp(argv[0],argv);
+            cout<<argv[0]<<": "<<strerror(errno)<<"\n";
             perror(argv[0]);
             _exit(EXIT_FAILURE);
           } //child process
