@@ -2,6 +2,7 @@
 #define WOOSH_H
 
 #include <unordered_map>
+#include <utility>
 #include <list>
 #include <iostream>
 #include "history.h"
@@ -28,5 +29,6 @@ llist<std::pair<string,int>> tokenizeInput(string str);
 void replaceAliases(string &input, unordered_map<string,string> &aliases);
 void historyExpansion(string &input, History* history);
 
+int woosh();
 
 #endif

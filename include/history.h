@@ -22,6 +22,8 @@ class History {
     string get(int idx);
     int max_size();
     int next_index();
+    
+    void clearHistory();
 
   private:
     History();

@@ -49,7 +49,7 @@ string builtInCd(string token, History* history) {
     int trimIdx=(levels-1)*3+2;
     if (token[trimIdx+1]=='/')
       trimIdx++;
-    string endPath=token.substr(trimIdx,token.length()-trimIdx);
+    string endPath=token.substr(trimIdx+1,token.length()-trimIdx-1);
     char *dest = getcwd(0,0);
     int idx;
     count=0;
@@ -103,7 +103,6 @@ void builtInAlias(string key, unordered_map<string,string> &aliases) {
 }
 
 void builtInSource(unordered_map<string,string> &aliases, string rcFile=".woosh/woosh.rc") {
-  
   std::ifstream rc;
   rc.open(rcFile);
   if (!rc.is_open()) {
@@ -205,9 +204,12 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
     string alKey = x.first;
     int alLength = alKey.length();
     int idx=0;
+    bool insideQuotes = false;
     do {
-      // if alias found at idx; check if it it a standalone token vs prefix and in-bounds || end of string
-      if (alKey.compare(input.substr(idx,alLength))==0) {
+      if (input[idx]=='"')
+        insideQuotes = !insideQuotes;
+      // if alias found at idx and not in quotes; check if it it a standalone token vs prefix and in-bounds || end of string
+      if (alKey.compare(input.substr(idx,alLength))==0 && !insideQuotes) {
         if ((idx==0 || input[idx-1]==' ') && //beginning is separated
         (idx+alLength<input.length() && input[idx+alLength]==' ' || idx+alLength==input.length())) {//end is separated
           if (x.second[0]=='"' && x.second[x.second.length()-1]=='"')
@@ -224,39 +226,41 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
 }
 
 void historyExpansion(string &input, History* history) {
-  int i=0;
+  int idx=0;
+  bool insideQuotes = false;
   bool neg=false;
-  while (i<input.length()) {
-    if (input[i]=='!') {
-      if (input[i+1]=='!') { //expand to !-1
-        input.replace(i,2,"!-1");
+  while (idx<input.length()) {
+    if (input[idx]=='"')
+      insideQuotes = !insideQuotes;
+    if (input[idx]=='!' && !insideQuotes) {
+      if (input[idx+1]=='!') { //expand to !-1
+        input.replace(idx,2,"!-1");
         continue;
       }
-      if (input[i+1]=='-') {
+      if (input[idx+1]=='-') {
         neg=true;
-        i++;
+        idx++;
       }
-      int numEnd=i;
+      int numEnd=idx;
       //check for number
       while(input[numEnd+1]>='0' && input[numEnd+1]<='9') {
         numEnd++;
       }
-      string tmp=input.substr(i+1,numEnd-i);
+      string tmp=input.substr(idx+1,numEnd-idx);
       if (tmp.length()>0) {
         int histNum = stoi(tmp);
         cout<<"histNUM["<<histNum<<"]\n";
         if (neg) {
           histNum = -histNum;
-          i--;
+          idx--;
         }
-        input.replace(i,numEnd-i+1,history->get(histNum));
-        i=numEnd;
+        input.replace(idx,numEnd-idx+1,history->get(histNum));
       } else {
         cout<<"valid history not found\n";
       }
       
     }
-    i++;
+    idx++;
   }
 }
 
@@ -269,7 +273,7 @@ void debugPrintList(llist<std::pair<string,int>> list) {
   std::clog<<" dbgEND\n";
 }
 
-int main(){
+int woosh() {
   unordered_map<string,string> aliases;
   History *history = history->getInstance();
   builtInSource(aliases);

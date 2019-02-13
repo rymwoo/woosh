@@ -60,3 +60,8 @@ int History::max_size() {
 int History::next_index(){
   return HIST_INDEX;
 }
+
+void History::clearHistory(){
+  HIST_INDEX = 1;
+  history.clear();
+}
