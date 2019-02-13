@@ -50,7 +50,7 @@ string History::get(int idx) {
   if (history[mod].first==idx) {
     return history[mod].second;
   } else {
-    std::cerr<<"could not locate valid history. index "<<idx<<" no longer stored in memory\n";
+    std::cerr<<"could not locate valid history. index "<<idx<<" not available in memory\n";
     return "";
   }
 }

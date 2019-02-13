@@ -32,6 +32,11 @@ BOOST_AUTO_TEST_CASE(going_up_and_down_directories) {
   BOOST_TEST(builtInCd("../../Programming/python",hist)=="/home/rymwoo/Desktop/Programming/python");
 }
 
+BOOST_AUTO_TEST_CASE(going_up_one_level) {
+  builtInCd("/home/rymwoo/Desktop/Programming",hist);
+  BOOST_TEST(builtInCd("..",hist)=="/home/rymwoo/Desktop/");
+}
+
 BOOST_AUTO_TEST_CASE(returning_to_previous_dir) {
   builtInCd("/home/rymwoo/Desktop/Programming/cpp",hist);
   builtInCd("../python",hist);
@@ -121,6 +126,7 @@ struct historyExpansionFixture {
     hist->push_back("cd ..");
     hist->push_back("ls -a");
     hist->push_back("cd /usr/bin");
+    hist->push_back("a");
     hist->push_back("cd -");
   }
   History *hist = hist->getInstance();
@@ -149,7 +155,7 @@ BOOST_AUTO_TEST_CASE(history_expansion_midtoken) {
 }
 
 BOOST_AUTO_TEST_CASE(history_expansion_nonexistent) {
-  input = "abc !95 !-5 def";
+  input = "abc !95 !-6 def";
   historyExpansion(input, hist);
   BOOST_TEST(input == "abc   def");
 }
@@ -161,15 +167,21 @@ BOOST_AUTO_TEST_CASE(history_expansion_ignored_inside_quotes) {
 }
 
 BOOST_AUTO_TEST_CASE(history_expansion_from_backwards) {
-  input = "abc !-2 def";
+  input = "abc !-3 def";
   historyExpansion(input, hist);
   BOOST_TEST(input == "abc cd /usr/bin def");
 }
 
 BOOST_AUTO_TEST_CASE(history_expansion_replace_entirety) {
-  input = "!-3";
+  input = "!-4";
   historyExpansion(input, hist);
   BOOST_TEST(input == "ls -a");
+}
+
+BOOST_AUTO_TEST_CASE(history_expansion_replacement_shorter_than_expansion) {
+  input = "!-2!-2";
+  historyExpansion(input, hist);
+  BOOST_TEST(input == "aa");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

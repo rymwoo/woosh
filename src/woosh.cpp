@@ -1,3 +1,10 @@
+//#define DEBUG
+#ifdef DEBUG
+#define DBG(x) x
+#else
+#define DBG(x)
+#endif
+
 #include "../include/woosh.h"
 #include <list>
 #include <unordered_map>
@@ -47,9 +54,9 @@ string builtInCd(string token, History* history) {
     }
     //copy part after ../ to endPath
     int trimIdx=(levels-1)*3+2;
-    if (token[trimIdx+1]=='/')
+    if (token[trimIdx]=='/')
       trimIdx++;
-    string endPath=token.substr(trimIdx+1,token.length()-trimIdx-1);
+    string endPath=token.substr(trimIdx,token.length()-trimIdx);
     char *dest = getcwd(0,0);
     int idx;
     count=0;
@@ -97,7 +104,7 @@ void builtInAlias(string key, unordered_map<string,string> &aliases) {
     string value = key.substr(idx+1,key.length()-idx-1);
     key = key.substr(0,idx);
 
-    std::clog<<"aliasing["<<key<<"]["<<value<<"]\n";
+    DBG(std::clog<<"aliasing["<<key<<"]["<<value<<"]\n";)
     aliases[key]=value;
   }
 }
@@ -185,7 +192,7 @@ llist<std::pair<string,int>> tokenizeInput(string str) {
   yy_scan_string(str.c_str());
   token = yylex();
   while(token){
-    std::clog<<"["<<yytext<<":"<<tokenNames[token]<<"]";
+    DBG(std::clog<<"["<<yytext<<":"<<tokenNames[token]<<"]";)
     string text = yytext;
     if (token==TOKEN) {
       if (text[0]=='"' && text[text.length()-1]=='"')
@@ -195,7 +202,7 @@ llist<std::pair<string,int>> tokenizeInput(string str) {
     input.push_back(pr);
     token = yylex();
   }
-  std::clog<<"\n";
+  DBG(std::clog<<"\n";)
   return input;
 }
 
@@ -216,7 +223,7 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
             input.replace(idx,alLength,x.second.substr(1,x.second.length()-2));
           else
             input.replace(idx,alLength,x.second);
-          std::clog<<"replaced ["<<x.first<<"] alias in input\n";
+          DBG(std::clog<<"replaced ["<<x.first<<"] alias in input\n";)
           idx+=x.second.length();
         }
       }
@@ -249,7 +256,7 @@ void historyExpansion(string &input, History* history) {
       string tmp=input.substr(idx+1,numEnd-idx);
       if (tmp.length()>0) {
         int histNum = stoi(tmp);
-        cout<<"histNUM["<<histNum<<"]\n";
+        DBG(cout<<"histNUM["<<histNum<<"]\n";)
         if (neg) {
           histNum = -histNum;
           idx--;
@@ -291,7 +298,7 @@ int woosh() {
 
     llist<std::pair<string,int>> inp = tokenizeInput(input);
 
-//    debugPrintList(inp);
+//    DBG(debugPrintList(inp);)
 
     //execute commands
     //built-in commands
@@ -402,23 +409,22 @@ int woosh() {
               redirectIter++;
             } while (redirectIter != inp.end());
 
-            std::clog<<"Child Process; executing command ["<<argv[0]<<"]...\n";
+            DBG(std::clog<<"Child Process; executing command ["<<argv[0]<<"]...\n";)
             execvp(argv[0],argv);
             cout<<argv[0]<<": "<<strerror(errno)<<"\n";
-            perror(argv[0]);
             _exit(EXIT_FAILURE);
           } //child process
           else { //parent process
             int status;
-            std::clog<<"Parent Process; childPID=["<<std::to_string(pid)<<"] - waiting...\n";
+            DBG(std::clog<<"Parent Process; childPID=["<<std::to_string(pid)<<"] - waiting...\n";)
             if (waitpid(pid,&status,0)<0) {
               std::cerr<<"WaitPID Error\n";
               return 1;
             }
             if WIFEXITED(status) {
-              std::clog<<"Child terminated okay\n";
+              DBG(std::clog<<"Child terminated okay\n";)
             } else {
-              std::clog<<"Child termination error\n";
+              std::clog<<"Child process termination error\n";
             }
             
           llist<std::pair<string,int>>::iterator it=inp.begin();
