@@ -1,7 +1,6 @@
 %{
 #include "parse.h"
 /*
-  
 */
 %}
 
@@ -14,7 +13,7 @@
 "cd"                return CD;
 "<"                 return REDIRECT_IN;
 [12&]?>(&[12])?     return REDIRECT_OUT;
-[^ \t\r|&;)(><]+    return TOKEN;
+[^ ]*[^\\]?\"([^"\\]|\\.)*\"[^ ]*|[^ ]+  return TOKEN;
  /*.                   ;*/
 
 %%
