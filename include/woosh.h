@@ -31,6 +31,7 @@ void historyExpansion(string &input, History* history);
 
 int countNumArgsPlusCmd(llist<std::pair<string,int>> &input);
 llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<string,int>> &input);
+char **parseArgsIntoCharArray(int numArgs, llist<std::pair<string,int>> &input);
 
 int woosh();
 

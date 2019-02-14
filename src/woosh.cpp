@@ -19,6 +19,7 @@
 #include <fstream>
 #include "../include/parse.h"
 #include "../include/history.h"
+#include "../include/jobs.h"
 
 /////////////////////////////
 /*
@@ -296,6 +297,79 @@ llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<strin
   return redirectIter;
 }
 
+char **parseArgsIntoCharArray(int numArgs, llist<std::pair<string,int>> &input) {
+  //parse commands and args into char** - ignore io_modifiers
+  char** argv = (char**)malloc(sizeof(char*)*(numArgs+1));
+  if (argv==NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+  int idx=0;
+  for(llist<std::pair<string,int>>::iterator it=input.begin(); idx<numArgs;++idx,++it) {
+    int strLen = (*it).first.length();
+    argv[idx]=(char*)malloc(strLen+1);
+    if (argv[idx]==NULL) {
+      perror("malloc");
+      exit(EXIT_FAILURE);
+    }
+    (*it).first.copy(argv[idx],strLen);
+    argv[idx][strLen]='\0';
+  }
+  argv[idx]=NULL;
+  return argv;
+}
+
+void setSignals(__sighandler_t value) {
+  signal(SIGINT,value);
+  signal(SIGQUIT,value);
+  signal(SIGTSTP,value);
+  signal(SIGTTIN,value);
+  signal(SIGTTOU,value);
+}
+
+void initializeShellForJobControl() {
+  pid_t self_PGid = getpgrp();
+  pid_t currentTermFgPG = tcgetpgrp(STDIN_FILENO);
+
+  if (self_PGid != currentTermFgPG){ //we are not a foreground process
+    cout<<"Shell must be started in foreground to handle job control\n";
+    exit(EXIT_FAILURE);
+  }
+  
+  pid_t self_pid = getpid(); 
+  if (setpgid(self_pid,self_pid) < 0){ // put self in new process group
+    perror("Could not put shell in new process group");
+    exit(EXIT_FAILURE);
+  }
+  tcsetpgrp(STDIN_FILENO,self_PGid); // make new self process ground in foreground
+
+  //ignore incoming signals
+  setSignals(SIG_IGN);
+}
+
+string readUserInput() {
+  string input;
+  fd_set descriptorSet;
+  FD_ZERO(&descriptorSet);
+  FD_SET(STDIN_FILENO, &descriptorSet);
+  timeval tv;
+  tv.tv_sec=0;
+  tv.tv_usec=0;
+  int cinStatus = select(1,&descriptorSet, NULL,NULL,&tv);
+  if (cinStatus<0) {
+    perror("select()");
+  } else if (cinStatus>0) {
+    showPrompt();
+    std::getline(std::cin,input);
+    cout<<input<<"\n";
+  } else {
+    do {
+    showPrompt();
+    std::getline(std::cin,input);
+    } while (input.empty());
+  }
+  return input;
+}
 void debugPrintList(llist<std::pair<string,int>> list) {
   llist<std::pair<string,int>>::iterator iter=list.begin();
   while (iter!=list.end()) {
@@ -308,15 +382,13 @@ void debugPrintList(llist<std::pair<string,int>> list) {
 int woosh() {
   unordered_map<string,string> aliases;
   History *history = history->getInstance();
+  JobController *jobs = jobs->getInstance();
   builtInSource(aliases);
-  
-  while (true) {
 
-    string input;
-    do {
-      showPrompt();
-      std::getline(std::cin,input);
-    } while (input.empty());
+  initializeShellForJobControl();
+
+  while (true) {
+    string input = readUserInput();
     historyExpansion(input, history);
     history->push_back(input);
     replaceAliases(input, aliases);
@@ -364,28 +436,21 @@ int woosh() {
           }
           break;
         } //case CD
+       case JOBS: {
+          jobs->printJobList();
+          break;
+        } //case JOBS
       default: { //not a built in command
-          //parse commands and args into char** - ignore io_modifiers
           int numArgs=countNumArgsPlusCmd(inp);
-          char** argv = (char**)malloc(sizeof(char*)*(numArgs+1));
-          int idx=0;
-          for(llist<std::pair<string,int>>::iterator it=inp.begin(); idx<numArgs;++idx,++it) {
-            int strLen = (*it).first.length();
-            argv[idx]=(char*)malloc(strLen+1);
-            (*it).first.copy(argv[idx],strLen);
-            argv[idx][strLen]='\0';
-          }
-          argv[idx]=NULL;
+          char **argv = parseArgsIntoCharArray(numArgs,inp);
 
-          bool backgroundProcess = false;
-          if (inp.back().first.compare("&")==0) {
-            backgroundProcess = true;
-            DBG(cout<<"forking process to run in background\n";)
-          }
+          bool backgroundProcess = (inp.back().first.compare("&")==0 && inp.back()!=inp.front());
+          DBG(backgroundProcess?cout<<"forking process to run in background\n":cout<<"";)
           pid_t pid = fork();
           if (pid<0) {
             std::cerr<<"Fork failed\n";
           } else if (pid==0) { //body of child process
+            setSignals(SIG_DFL); //reset signals to defaults
             //handling redirects
             llist<std::pair<string,int>>::iterator redirectIter = moveIterToEndOfArgs(inp);
             do { //while (redirectIter != inp.end());
@@ -443,9 +508,13 @@ int woosh() {
           } //child process
           else { //parent process
             int status;
+
             DBG(std::clog<<"Parent Process; childPID=["<<std::to_string(pid)<<"] - waiting...\n";)
-            if (!backgroundProcess) {
+            if (backgroundProcess) {
+              jobs->addJob(pid, argv[0]);
+            } else {
               if (waitpid(pid,&status,0)<0) {
+
                 std::cerr<<"WaitPID Error\n";
                 return 1;
               }
@@ -465,6 +534,6 @@ int woosh() {
           break;
         } //case default
     }
-  }
+  } //while (true);
   return 0;
 }

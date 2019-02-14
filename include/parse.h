@@ -6,3 +6,4 @@
 #define REDIRECT_IN 6
 #define REDIRECT_OUT 7
 #define TOKEN 8
+#define JOBS 9
