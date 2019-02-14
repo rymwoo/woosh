@@ -271,6 +271,31 @@ void historyExpansion(string &input, History* history) {
   }
 }
 
+int countNumArgsPlusCmd(llist<std::pair<string,int>> &input) {
+  //find where commands + args end / redirection io modifiers start
+  llist<std::pair<string,int>>::iterator redirectIter=input.begin();
+  int redirectIdx=0;
+  do {
+    redirectIdx++;
+    if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
+      break;
+    redirectIter++;
+  } while (redirectIter!=input.end());
+  return redirectIdx;
+}
+
+llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<string,int>> &input) {
+  llist<std::pair<string,int>>::iterator redirectIter=input.begin();
+  int redirectIdx=0;
+  do {
+    redirectIdx++;
+    if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
+      break;
+    redirectIter++;
+  } while (redirectIter!=input.end());
+  return redirectIter;
+}
+
 void debugPrintList(llist<std::pair<string,int>> list) {
   llist<std::pair<string,int>>::iterator iter=list.begin();
   while (iter!=list.end()) {
@@ -340,19 +365,11 @@ int woosh() {
           break;
         } //case CD
       default: { //not a built in command
-          //find where commands + args end / redirection io modifiers start
-          llist<std::pair<string,int>>::iterator redirectIter=inp.begin();
-          int redirectIdx=0;
-          do {
-            redirectIdx++;
-            if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
-              break;
-            redirectIter++;
-          } while (redirectIter!=inp.end());
           //parse commands and args into char** - ignore io_modifiers
-          char** argv = (char**)malloc(sizeof(char*)*redirectIdx);
+          int numArgs=countNumArgsPlusCmd(inp);
+          char** argv = (char**)malloc(sizeof(char*)*(numArgs+1));
           int idx=0;
-          for(llist<std::pair<string,int>>::iterator it=inp.begin(); idx<redirectIdx;++idx,++it) {
+          for(llist<std::pair<string,int>>::iterator it=inp.begin(); idx<numArgs;++idx,++it) {
             int strLen = (*it).first.length();
             argv[idx]=(char*)malloc(strLen+1);
             (*it).first.copy(argv[idx],strLen);
@@ -370,6 +387,7 @@ int woosh() {
             std::cerr<<"Fork failed\n";
           } else if (pid==0) { //body of child process
             //handling redirects
+            llist<std::pair<string,int>>::iterator redirectIter = moveIterToEndOfArgs(inp);
             do { //while (redirectIter != inp.end());
               if ((*redirectIter).second == REDIRECT_IN) {
                 redirectIter++;
@@ -409,7 +427,6 @@ int woosh() {
                   char descriptor = destination[destination.length()-1];
                   redirectOutputDescriptor(origin, descriptor);
                 }
-                
               } //REDIRECT_OUT
               redirectIter++;
             } while (redirectIter != inp.end());
@@ -417,6 +434,11 @@ int woosh() {
             DBG(std::clog<<"Child Process; executing command ["<<argv[0]<<"]...\n";)
             execvp(argv[0],argv);
             cout<<argv[0]<<": "<<strerror(errno)<<"\n";
+            //failed to terminate, so clean up memory
+            for(int i=0;i<numArgs;++i) {
+              free(argv[i]);
+            }
+            free(argv);
             _exit(EXIT_FAILURE);
           } //child process
           else { //parent process
@@ -435,15 +457,7 @@ int woosh() {
             }
             
             //cleaning up linked list of args
-            redirectIter=inp.begin();
-            int redirectIdx=0;
-            do {
-              redirectIdx++;
-              if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
-                break;
-              redirectIter++;
-            } while (redirectIter!=inp.end());
-            for(int i=0;i<redirectIdx;++i) {
+            for(int i=0;i<numArgs;++i) {
               free(argv[i]);
             }
             free(argv);

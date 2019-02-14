@@ -29,6 +29,9 @@ llist<std::pair<string,int>> tokenizeInput(string str);
 void replaceAliases(string &input, unordered_map<string,string> &aliases);
 void historyExpansion(string &input, History* history);
 
+int countNumArgsPlusCmd(llist<std::pair<string,int>> &input);
+llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<string,int>> &input);
+
 int woosh();
 
 #endif
