@@ -1,4 +1,4 @@
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else
@@ -344,10 +344,10 @@ int woosh() {
           llist<std::pair<string,int>>::iterator redirectIter=inp.begin();
           int redirectIdx=0;
           do {
-            redirectIter++;
             redirectIdx++;
-            if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT)
+            if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
               break;
+            redirectIter++;
           } while (redirectIter!=inp.end());
           //parse commands and args into char** - ignore io_modifiers
           char** argv = (char**)malloc(sizeof(char*)*redirectIdx);
@@ -360,6 +360,11 @@ int woosh() {
           }
           argv[idx]=NULL;
 
+          bool backgroundProcess = false;
+          if (inp.back().first.compare("&")==0) {
+            backgroundProcess = true;
+            DBG(cout<<"forking process to run in background\n";)
+          }
           pid_t pid = fork();
           if (pid<0) {
             std::cerr<<"Fork failed\n";
@@ -417,25 +422,27 @@ int woosh() {
           else { //parent process
             int status;
             DBG(std::clog<<"Parent Process; childPID=["<<std::to_string(pid)<<"] - waiting...\n";)
-            if (waitpid(pid,&status,0)<0) {
-              std::cerr<<"WaitPID Error\n";
-              return 1;
-            }
-            if WIFEXITED(status) {
-              DBG(std::clog<<"Child terminated okay\n";)
-            } else {
-              std::clog<<"Child process termination error\n";
+            if (!backgroundProcess) {
+              if (waitpid(pid,&status,0)<0) {
+                std::cerr<<"WaitPID Error\n";
+                return 1;
+              }
+              if WIFEXITED(status) {
+                DBG(std::clog<<"Child terminated okay\n";)
+              } else {
+                std::clog<<"Child process termination error\n";
+              }
             }
             
-          llist<std::pair<string,int>>::iterator it=inp.begin();
-          int redirectIdx=0;
-          do {
-            it++;
-            redirectIdx++;
-            if ((*it).second==REDIRECT_IN || (*it).second==REDIRECT_OUT)
-              break;
-          } while (it!=inp.end());
-
+            //cleaning up linked list of args
+            redirectIter=inp.begin();
+            int redirectIdx=0;
+            do {
+              redirectIdx++;
+              if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
+                break;
+              redirectIter++;
+            } while (redirectIter!=inp.end());
             for(int i=0;i<redirectIdx;++i) {
               free(argv[i]);
             }
