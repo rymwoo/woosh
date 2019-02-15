@@ -21,6 +21,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c* $(INCLUDE_DIR)/%.h
 	$(CXX) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.cpp
+	mkdir -p $(OBJ_DIR)
 	$(CXX) -c $< -o $@
 	
 $(SRC_DIR)/parse.c: $(SRC_DIR)/parse.l
