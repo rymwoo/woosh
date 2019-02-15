@@ -7,3 +7,4 @@
 #define REDIRECT_OUT 7
 #define TOKEN 8
 #define JOBS 9
+#define MAX_TOKEN_NAMES 10

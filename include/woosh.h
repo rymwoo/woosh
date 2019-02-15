@@ -5,6 +5,7 @@
 #include <utility>
 #include <list>
 #include <iostream>
+#include <signal.h>
 #include "history.h"
 
 using std::unordered_map;
@@ -32,6 +33,13 @@ void historyExpansion(string &input, History* history);
 int countNumArgsPlusCmd(llist<std::pair<string,int>> &input);
 llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<string,int>> &input);
 char **parseArgsIntoCharArray(int numArgs, llist<std::pair<string,int>> &input);
+
+void setSignals(__sighandler_t value);
+void handlerSIGCHLD(int signal);
+void blockSIGCHLD(bool block);
+
+void initializeShellForJobControl();
+string waitForInput();
 
 int woosh();
 

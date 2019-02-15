@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else
@@ -14,8 +14,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <string>
 #include <utility>
+#include <signal.h>
 #include <fstream>
 #include "../include/parse.h"
 #include "../include/history.h"
@@ -103,8 +105,11 @@ void builtInAlias(string key, unordered_map<string,string> &aliases) {
     std::cerr<<"malformed alias. requires an '=' sign\n";
   } else {
     string value = key.substr(idx+1,key.length()-idx-1);
+    if (value.empty() || value.compare("\"\"")==0){
+      cout<<"malformed alias. cannot contain empty key\n";
+      return;
+    }
     key = key.substr(0,idx);
-
     DBG(std::clog<<"aliasing["<<key<<"]["<<value<<"]\n";)
     aliases[key]=value;
   }
@@ -184,15 +189,18 @@ void showPrompt() {
     prompt.replace(0,pos+strlen(name),"~");
   }
   cout<<"[@"<<name<<"]"<<prompt<<" >> ";
+  cout.flush();
 }
 
 llist<std::pair<string,int>> tokenizeInput(string str) {
-  const string tokenNames[] = {"", "HISTORY","EXIT","ALIAS", "SOURCE", "CD", "REDIRECT_IN", "REDIRECT_OUT", "TOKEN"};
+  const string tokenNames[MAX_TOKEN_NAMES] = {"", "HISTORY","EXIT","ALIAS", "SOURCE", "CD", "REDIRECT_IN", "REDIRECT_OUT", "TOKEN", "JOBS"};
   llist<std::pair<string,int>> input;
   int token;
   yy_scan_string(str.c_str());
   token = yylex();
   while(token){
+    DBG(if (token>MAX_TOKEN_NAMES)
+      cout<<"tokenNames array out of bound\n";)
     DBG(std::clog<<"["<<yytext<<":"<<tokenNames[token]<<"]";)
     string text = yytext;
     if (token==TOKEN) {
@@ -213,7 +221,7 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
     int alLength = alKey.length();
     int idx=0;
     bool insideQuotes = false;
-    do {
+    while (idx < input.length()) {
       if (input[idx]=='"')
         insideQuotes = !insideQuotes;
       // if alias found at idx and not in quotes; check if it it a standalone token vs prefix and in-bounds || end of string
@@ -229,7 +237,7 @@ void replaceAliases(string &input, unordered_map<string,string> &aliases) {
         }
       }
       idx++;
-    } while (idx < input.length());
+    }
   }
 }
 
@@ -277,9 +285,9 @@ int countNumArgsPlusCmd(llist<std::pair<string,int>> &input) {
   llist<std::pair<string,int>>::iterator redirectIter=input.begin();
   int redirectIdx=0;
   do {
-    redirectIdx++;
     if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
       break;
+    redirectIdx++;
     redirectIter++;
   } while (redirectIter!=input.end());
   return redirectIdx;
@@ -287,9 +295,7 @@ int countNumArgsPlusCmd(llist<std::pair<string,int>> &input) {
 
 llist<std::pair<string,int>>::iterator moveIterToEndOfArgs(llist<std::pair<string,int>> &input) {
   llist<std::pair<string,int>>::iterator redirectIter=input.begin();
-  int redirectIdx=0;
   do {
-    redirectIdx++;
     if ((*redirectIter).second==REDIRECT_IN || (*redirectIter).second==REDIRECT_OUT || (*redirectIter).first.compare("&")==0)
       break;
     redirectIter++;
@@ -327,6 +333,29 @@ void setSignals(__sighandler_t value) {
   signal(SIGTTOU,value);
 }
 
+void handlerSIGCHLD(int signal) {
+  DBG(cout<<"SIGCHLD RECEIVED\n";)
+  JobController *jobs = jobs->getInstance();
+  jobs->updateJobStatus();
+  if (jobs->anyBGJobsExited()) {
+    jobs->cleanUpCompletedJobs();
+      showPrompt();
+  }
+}
+
+void blockSIGCHLD(bool block){
+  //block SIGCHLD signal
+  sigset_t signalSet;
+  sigemptyset(&signalSet);
+  sigaddset(&signalSet,SIGCHLD);
+
+  if (block) {
+    sigprocmask(SIG_SETMASK,&signalSet,NULL);
+  } else {
+    sigprocmask(SIG_UNBLOCK,&signalSet,NULL);
+  }
+}
+
 void initializeShellForJobControl() {
   pid_t self_PGid = getpgrp();
   pid_t currentTermFgPG = tcgetpgrp(STDIN_FILENO);
@@ -347,25 +376,39 @@ void initializeShellForJobControl() {
   setSignals(SIG_IGN);
 }
 
-string readUserInput() {
+string waitForInput() {
   string input;
   fd_set descriptorSet;
   FD_ZERO(&descriptorSet);
   FD_SET(STDIN_FILENO, &descriptorSet);
   timeval tv;
   tv.tv_sec=0;
-  tv.tv_usec=0;
-  int cinStatus = select(1,&descriptorSet, NULL,NULL,&tv);
+  tv.tv_usec=1;
+  int cinStatus = select(STDIN_FILENO+1,&descriptorSet, NULL,NULL,&tv);
+
+  pollfd fds;
+  fds.fd = STDIN_FILENO;
+  fds.events = POLLIN;
+
   if (cinStatus<0) {
     perror("select()");
   } else if (cinStatus>0) {
-    showPrompt();
+    blockSIGCHLD(true);
     std::getline(std::cin,input);
+    blockSIGCHLD(false);
+    showPrompt();
     cout<<input<<"\n";
   } else {
     do {
-    showPrompt();
-    std::getline(std::cin,input);
+      showPrompt();
+      do {
+        blockSIGCHLD(true);
+        poll(&fds,1,0);
+        blockSIGCHLD(false);
+      } while (fds.revents!=POLLIN);
+      blockSIGCHLD(true);
+      std::getline(std::cin,input);
+      blockSIGCHLD(false);
     } while (input.empty());
   }
   return input;
@@ -386,13 +429,17 @@ int woosh() {
   builtInSource(aliases);
 
   initializeShellForJobControl();
+  //register SIGCHLD handler 
+  signal(SIGCHLD,handlerSIGCHLD);
 
   while (true) {
-    string input = readUserInput();
-    historyExpansion(input, history);
+    string input;
+    do {
+      input = waitForInput();
+      historyExpansion(input, history);
+    } while (input.empty());
     history->push_back(input);
     replaceAliases(input, aliases);
-
     llist<std::pair<string,int>> inp = tokenizeInput(input);
 
 //    DBG(debugPrintList(inp);)
@@ -450,6 +497,7 @@ int woosh() {
           if (pid<0) {
             std::cerr<<"Fork failed\n";
           } else if (pid==0) { //body of child process
+            DBG(std::clog<<"Child PID=["<<getpid()<<"]\n";)
             setSignals(SIG_DFL); //reset signals to defaults
             //handling redirects
             llist<std::pair<string,int>>::iterator redirectIter = moveIterToEndOfArgs(inp);
@@ -496,10 +544,10 @@ int woosh() {
               redirectIter++;
             } while (redirectIter != inp.end());
 
-            DBG(std::clog<<"Child Process; executing command ["<<argv[0]<<"]...\n";)
+            DBG(std::clog<<"Child PID=["<<getpid()<<"]; executing command ["<<argv[0]<<"]...\n";)
             execvp(argv[0],argv);
             cout<<argv[0]<<": "<<strerror(errno)<<"\n";
-            //failed to terminate, so clean up memory
+            //failed to execute, so clean up memory
             for(int i=0;i<numArgs;++i) {
               free(argv[i]);
             }
@@ -507,12 +555,12 @@ int woosh() {
             _exit(EXIT_FAILURE);
           } //child process
           else { //parent process
-            int status;
-
-            DBG(std::clog<<"Parent Process; childPID=["<<std::to_string(pid)<<"] - waiting...\n";)
+            DBG(std::clog<<"Parent PID=["<<getpid()<<"]\n";)
             if (backgroundProcess) {
               jobs->addJob(pid, argv[0]);
             } else {
+              DBG(std::clog<<"Parent Process waiting for child...\n";)
+              int status; 
               if (waitpid(pid,&status,0)<0) {
 
                 std::cerr<<"WaitPID Error\n";
@@ -524,7 +572,7 @@ int woosh() {
                 std::clog<<"Child process termination error\n";
               }
             }
-            
+
             //cleaning up linked list of args
             for(int i=0;i<numArgs;++i) {
               free(argv[i]);
@@ -533,7 +581,7 @@ int woosh() {
           } // parent process
           break;
         } //case default
-    }
+    } //switch statement
   } //while (true);
   return 0;
 }

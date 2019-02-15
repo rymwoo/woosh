@@ -10,9 +10,8 @@ History::History() {}
 
 History* History::getInstance() {
   if (instance==NULL)
-    return new History();
-  else
-    return instance;
+    instance = new History();
+  return instance;
 }
 
 void History::setPreviousDir(char* src) {

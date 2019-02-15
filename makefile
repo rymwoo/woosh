@@ -32,6 +32,9 @@ test: $(TEST)
 $(TEST): $(OBJ_TEST) $(OBJS)
 	$(CXX) -o $@ $(UNIT_TEST_LIB) $^
 
+debug: $(OBJS) main.cpp
+	$(CXX) $^ -g -o $@
+
 clean:
 	rm -rf $(OBJ_DIR)/*.o
 
