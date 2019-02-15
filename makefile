@@ -18,6 +18,7 @@ $(EXE): $(OBJS) main.cpp
 	$(CXX) $^ -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c* $(INCLUDE_DIR)/%.h
+	mkdir -p $(OBJ_DIR)
 	$(CXX) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.cpp
