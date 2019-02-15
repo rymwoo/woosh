@@ -1,6 +1,6 @@
 This is a basic shell program that supports the following:
 
-# Built-in commands:
+# Available commands:
 --------------------
 
 ### cd
@@ -50,3 +50,6 @@ This is a basic shell program that supports the following:
 **source [file]** reads aliases from file. If file is not specified, defaults to reading from .woosh/woosh.rc
 ### background:
 **command &** will execute command as background process
+### other commands:
+**ls -a** will fork a child process to execute **ls** with **-a** as part of argument list
+
